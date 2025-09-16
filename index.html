@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Seguimiento de Camiones</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .mode-selector {
+            background: white;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .mode-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            margin: 0 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .mode-btn:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+
+        .mode-btn.active {
+            background: #28a745;
+        }
+
+        /* VISTA CONDUCTOR */
+        .driver-view {
+            display: none;
+            padding: 20px;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .driver-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .driver-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 16px;
+            margin-bottom: 15px;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .driver-input:focus {
+            border-color: #667eea;
+        }
+
+        .start-btn {
+            width: 100%;
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .start-btn:hover {
+            background: #218838;
+        }
+
+        .start-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .stop-btn {
+            background: #dc3545;
+        }
+
+        .stop-btn:hover {
+            background: #c82333;
+        }
+
+        .status-info {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .location-display {
+            font-size: 14px;
+            color: #6c757d;
+            margin-top: 10px;
+            word-break: break-all;
+        }
+
+        /* VISTA ADMINISTRADOR */
+        .admin-view {
+            display: none;
+        }
+
+        .admin-container {
+            display: flex;
+            height: calc(100vh - 140px);
+        }
+
+        .sidebar {
+            width: 350px;
+            background: white;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+
+        .truck-list {
+            padding: 20px;
+        }
+
+        .truck-card {
+            background: white;
+            border: 2px solid #e1e5e9;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .truck-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+
+        .truck-card.active {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .truck-name {
+            font-weight: bold;
+            font-size: 16px;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+
+        .truck-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+
+        .status-online {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-offline {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .truck-details {
+            font-size: 14px;
+            color: #6c757d;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+
+        .map-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        .control-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 0 5px;
+            font-size: 12px;
+            transition: background 0.3s ease;
+        }
+
+        .control-btn:hover {
+            background: #5a6fd8;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px;
+            background: #28a745;
+            color: white;
+            border-radius: 8px;
+            z-index: 10000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.error {
+            background: #dc3545;
+        }
+
+        @media (max-width: 768px) {
+            .admin-container {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                height: 300px;
+            }
+            .map-container {
+                height: calc(100vh - 440px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚛 Sistema de Seguimiento</h1>
+        <p>Ubicación en tiempo real</p>
+    </div>
+
+    <div class="mode-selector">
+        <button class="mode-btn active" id="driverModeBtn">👤 Soy Conductor</button>
+        <button class="mode-btn" id="adminModeBtn">👁️ Soy Administrador</button>
+    </div>
+
+    <!-- VISTA CONDUCTOR -->
+    <div class="driver-view" id="driverView">
+        <div class="driver-card">
+            <h2>📍 Compartir mi ubicación</h2>
+            <p style="color: #6c757d; margin-bottom: 25px;">
+                Ingresa tu nombre y activa el seguimiento para que el administrador pueda verte en el mapa.
+            </p>
+            
+            <input type="text" 
+                   id="driverName" 
+                   class="driver-input" 
+                   placeholder="Tu nombre completo">
+            
+            <input type="text" 
+                   id="truckId" 
+                   class="driver-input" 
+                   placeholder="Patente del camión (ej: ABC123)">
+            
+            <button id="startTrackingBtn" class="start-btn">
+                🚀 Iniciar Seguimiento
+            </button>
+            
+            <div class="status-info" id="statusInfo">
+                <strong>Estado:</strong> Desconectado<br>
+                <small>Presiona "Iniciar Seguimiento" para comenzar</small>
+            </div>
+            
+            <div class="location-display" id="locationDisplay"></div>
+        </div>
+    </div>
+
+    <!-- VISTA ADMINISTRADOR -->
+    <div class="admin-view" id="adminView">
+        <div class="admin-container">
+            <div class="sidebar">
+                <div class="truck-list">
+                    <h3 style="margin-bottom: 15px; color: #2c3e50;">🚛 Camiones Activos</h3>
+                    <div id="truckList">
+                        <p style="color: #6c757d; text-align: center; padding: 20px;">
+                            No hay camiones conectados.<br>
+                            Los conductores deben activar el seguimiento desde sus teléfonos.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="map-container">
+                <div class="map-controls">
+                    <button class="control-btn" id="centerMapBtn">🎯 Centrar Mapa</button>
+                    <button class="control-btn" id="refreshBtn">🔄 Actualizar</button>
+                </div>
+                <div id="map"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="notification" id="notification"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Variables globales
+        let currentMode = 'driver';
+        let map = null;
+        let watchId = null;
+        let isTracking = false;
+        let trucks = {};
+        let markers = {};
+        let selectedTruck = null;
+
+        // Inicializar mapa (solo para vista admin)
+        function initMap() {
+            if (map) return;
+            
+            map = L.map('map').setView([-34.6037, -58.3816], 10);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        }
+
+        // Alternar entre modos
+        function switchMode(mode) {
+            currentMode = mode;
+            
+            // Actualizar botones
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            if (mode === 'driver') {
+                document.getElementById('driverModeBtn').classList.add('active');
+                document.getElementById('driverView').style.display = 'block';
+                document.getElementById('adminView').style.display = 'none';
+            } else {
+                document.getElementById('adminModeBtn').classList.add('active');
+                document.getElementById('driverView').style.display = 'none';
+                document.getElementById('adminView').style.display = 'block';
+                initMap();
+                loadTrucks();
+            }
+        }
+
+        // Mostrar notificación
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification show ${type}`;
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // FUNCIONES DEL CONDUCTOR
+        function startTracking() {
+            const driverName = document.getElementById('driverName').value.trim();
+            const truckId = document.getElementById('truckId').value.trim();
+            
+            if (!driverName || !truckId) {
+                showNotification('Por favor completa tu nombre y patente del camión', 'error');
+                return;
+            }
+
+            if (!navigator.geolocation) {
+                showNotification('Tu navegador no soporta geolocalización', 'error');
+                return;
+            }
+
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            };
+
+            watchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    const location = {
+                        id: truckId,
+                        driverName: driverName,
+                        truckId: truckId,
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
+                        accuracy: position.coords.accuracy,
+                        timestamp: new Date().toISOString(),
+                        speed: position.coords.speed || 0
+                    };
+
+                    // Guardar en localStorage para simular servidor
+                    saveTruckLocation(location);
+                    updateDriverStatus(location);
+                },
+                (error) => {
+                    let errorMsg = 'Error al obtener ubicación: ';
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMsg += 'Permisos de ubicación denegados. Por favor habilita la ubicación en tu navegador.';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMsg += 'Ubicación no disponible.';
+                            break;
+                        case error.TIMEOUT:
+                            errorMsg += 'Tiempo de espera agotado.';
+                            break;
+                        default:
+                            errorMsg += 'Error desconocido.';
+                            break;
+                    }
+                    showNotification(errorMsg, 'error');
+                    console.error('Error:', error);
+                },
+                options
+            );
+
+            isTracking = true;
+            updateDriverUI();
+            showNotification('¡Seguimiento iniciado correctamente!');
+        }
+
+        function stopTracking() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            
+            // Remover del localStorage
+            const truckId = document.getElementById('truckId').value.trim();
+            if (truckId) {
+                removeTruckLocation(truckId);
+            }
+            
+            isTracking = false;
+            updateDriverUI();
+            showNotification('Seguimiento detenido');
+        }
+
+        function updateDriverUI() {
+            const startBtn = document.getElementById('startTrackingBtn');
+            const statusInfo = document.getElementById('statusInfo');
+            
+            if (isTracking) {
+                startBtn.textContent = '⏹️ Detener Seguimiento';
+                startBtn.className = 'start-btn stop-btn';
+                startBtn.onclick = stopTracking;
+                statusInfo.innerHTML = '<strong>Estado:</strong> ✅ Activo - Enviando ubicación';
+                statusInfo.className = 'status-info status-active pulse';
+            } else {
+                startBtn.textContent = '🚀 Iniciar Seguimiento';
+                startBtn.className = 'start-btn';
+                startBtn.onclick = startTracking;
+                statusInfo.innerHTML = '<strong>Estado:</strong> ❌ Desconectado<br><small>Presiona "Iniciar Seguimiento" para comenzar</small>';
+                statusInfo.className = 'status-info';
+                document.getElementById('locationDisplay').innerHTML = '';
+            }
+        }
+
+        function updateDriverStatus(location) {
+            const locationDisplay = document.getElementById('locationDisplay');
+            locationDisplay.innerHTML = `
+                <strong>📍 Última ubicación:</strong><br>
+                Lat: ${location.lat.toFixed(6)}<br>
+                Lng: ${location.lng.toFixed(6)}<br>
+                Precisión: ${Math.round(location.accuracy)}m<br>
+                ⏰ ${new Date(location.timestamp).toLocaleTimeString()}
+            `;
+        }
+
+        // FUNCIONES DE ALMACENAMIENTO (simulando servidor)
+        function saveTruckLocation(location) {
+            const trucks = JSON.parse(localStorage.getItem('trucks') || '{}');
+            trucks[location.id] = location;
+            localStorage.setItem('trucks', JSON.stringify(trucks));
+        }
+
+        function removeTruckLocation(truckId) {
+            const trucks = JSON.parse(localStorage.getItem('trucks') || '{}');
+            delete trucks[truckId];
+            localStorage.setItem('trucks', JSON.stringify(trucks));
+        }
+
+        function loadTrucks() {
+            trucks = JSON.parse(localStorage.getItem('trucks') || '{}');
+            updateTruckList();
+            updateMap();
+        }
+
+        // FUNCIONES DEL ADMINISTRADOR
+        function updateTruckList() {
+            const truckListEl = document.getElementById('truckList');
+            const truckEntries = Object.values(trucks);
+            
+            if (truckEntries.length === 0) {
+                truckListEl.innerHTML = `
+                    <p style="color: #6c757d; text-align: center; padding: 20px;">
+                        No hay camiones conectados.<br>
+                        Los conductores deben activar el seguimiento desde sus teléfonos.
+                    </p>
+                `;
+                return;
+            }
+
+            truckListEl.innerHTML = truckEntries.map(truck => {
+                const lastUpdate = new Date(truck.timestamp);
+                const isOnline = (Date.now() - lastUpdate.getTime()) < 60000; // Consideramos online si actualizó en el último minuto
+                
+                return `
+                    <div class="truck-card ${selectedTruck === truck.id ? 'active' : ''}" 
+                         onclick="selectTruck('${truck.id}')">
+                        <div class="truck-name">${truck.truckId}</div>
+                        <div class="truck-status ${isOnline ? 'status-online' : 'status-offline'}">
+                            ${isOnline ? '🟢 Conectado' : '🔴 Desconectado'}
+                        </div>
+                        <div class="truck-details">
+                            <div class="detail-row">
+                                <span>👤 Conductor:</span>
+                                <span>${truck.driverName}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span>📍 Ubicación:</span>
+                                <span>${truck.lat.toFixed(4)}, ${truck.lng.toFixed(4)}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span>⏰ Última actualización:</span>
+                                <span>${lastUpdate.toLocaleTimeString()}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span>🎯 Precisión:</span>
+                                <span>${Math.round(truck.accuracy)}m</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateMap() {
+            if (!map) return;
+            
+            // Limpiar marcadores existentes
+            Object.values(markers).forEach(marker => {
+                map.removeLayer(marker);
+            });
+            markers = {};
+
+            // Agregar nuevos marcadores
+            Object.values(trucks).forEach(truck => {
+                const lastUpdate = new Date(truck.timestamp);
+                const isOnline = (Date.now() - lastUpdate.getTime()) < 60000;
+                
+                const icon = L.divIcon({
+                    className: 'truck-marker',
+                    html: isOnline ? '🚛' : '⚫',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15]
+                });
+
+                const marker = L.marker([truck.lat, truck.lng], { icon }).addTo(map);
+                
+                const popupContent = `
+                    <div style="text-align: center; min-width: 200px;">
+                        <h3>${truck.truckId}</h3>
+                        <p><strong>👤</strong> ${truck.driverName}</p>
+                        <p><strong>📍</strong> ${truck.lat.toFixed(6)}, ${truck.lng.toFixed(6)}</p>
+                        <p><strong>🎯</strong> Precisión: ${Math.round(truck.accuracy)}m</p>
+                        <p><strong>⏰</strong> ${lastUpdate.toLocaleString()}</p>
+                        <p><strong>🔗</strong> ${isOnline ? 'Conectado' : 'Desconectado'}</p>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+                marker.on('click', () => selectTruck(truck.id));
+                markers[truck.id] = marker;
+            });
+        }
+
+        function selectTruck(truckId) {
+            selectedTruck = selectedTruck === truckId ? null : truckId;
+            
+            if (selectedTruck && trucks[truckId]) {
+                const truck = trucks[truckId];
+                map.setView([truck.lat, truck.lng], 15);
+            }
+            
+            updateTruckList();
+        }
+
+        function centerMap() {
+            if (!map) return;
+            
+            const truckPositions = Object.values(trucks).map(truck => [truck.lat, truck.lng]);
+            
+            if (truckPositions.length === 0) {
+                map.setView([-34.6037, -58.3816], 10);
+            } else if (truckPositions.length === 1) {
+                map.setView(truckPositions[0], 15);
+            } else {
+                const group = new L.featureGroup(Object.values(markers));
+                map.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+
+        // Event Listeners
+        document.getElementById('driverModeBtn').onclick = () => switchMode('driver');
+        document.getElementById('adminModeBtn').onclick = () => switchMode('admin');
+        document.getElementById('centerMapBtn').onclick = centerMap;
+        document.getElementById('refreshBtn').onclick = loadTrucks;
+
+        // Inicializar
+        switchMode('driver');
+        updateDriverUI();
+
+        // Auto-actualizar vista admin cada 10 segundos
+        setInterval(() => {
+            if (currentMode === 'admin') {
+                loadTrucks();
+            }
+        }, 10000);
+
+        // Mantener la pantalla activa (prevenir que el teléfono se duerma)
+        if ('wakeLock' in navigator) {
+            let wakeLock = null;
+            
+            async function requestWakeLock() {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                } catch (err) {
+                    console.log('Wake Lock no disponible:', err);
+                }
+            }
+            
+            // Activar wake lock cuando se inicia el seguimiento
+            const originalStartTracking = startTracking;
+            startTracking = function() {
+                originalStartTracking();
+                requestWakeLock();
+            };
+        }
+    </script>
+</body>
+</html>
